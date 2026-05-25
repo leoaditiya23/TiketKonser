@@ -8,13 +8,11 @@ if __name__ == "__main__":
     print("Silakan akses melalui URL 'Network URL' yang muncul di bawah ini.")
     print("="*50)
     
-    # Menjalankan streamlit pada IP 0.0.0.0 agar bisa diakses di jaringan lokal (HP)
+    # Menjalankan streamlit secara default (sudah otomatis memberikan Network URL dan Local URL)
     sys.exit(subprocess.run([
         sys.executable, 
         "-m", 
         "streamlit", 
         "run", 
-        "tiketkonser.py", 
-        "--server.address", 
-        "0.0.0.0"
+        "tiketkonser.py"
     ]).returncode)
