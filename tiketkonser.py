@@ -48,6 +48,7 @@ h1, h2, h3, .hero-title {
     padding: 1.8rem 2rem;
     box-shadow: var(--shadow);
     animation: fadeUp 600ms ease both;
+    margin-bottom: 2rem;
 }
 
 .hero-inner {
@@ -143,6 +144,7 @@ h1, h2, h3, .hero-title {
     color: var(--muted);
     background: #ffffff;
     animation: fadeUp 500ms ease both;
+    transition: all 0.3s ease;
 }
 
 .step.done {
@@ -164,15 +166,6 @@ h1, h2, h3, .hero-title {
 .stepper .step:nth-child(5) { animation-delay: 240ms; }
 .stepper .step:nth-child(6) { animation-delay: 300ms; }
 
-.card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 1.3rem 1.3rem 0.6rem 1.3rem;
-    box-shadow: var(--shadow);
-    animation: fadeUp 600ms ease both;
-}
-
 .section-title {
     font-size: 1.1rem;
     font-weight: 600;
@@ -187,19 +180,19 @@ div[data-testid="stButton"] button {
     padding: 0.6rem 1.2rem;
     font-weight: 600;
     box-shadow: 0 12px 24px rgba(255, 122, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+div[data-testid="stButton"] button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 32px rgba(255, 122, 0, 0.3);
 }
 
 div[data-testid="stButton"] button:disabled {
     background: #f1f1f1;
     color: #9aa0a6;
     box-shadow: none;
-}
-
-div[data-testid="stSelectbox"] > div,
-div[data-testid="stTextInput"] input,
-div[data-testid="stNumberInput"] input {
-    border-radius: 12px;
-    border: 1px solid var(--border);
+    transform: none;
 }
 
 div[data-testid="stMetric"] {
@@ -218,27 +211,28 @@ div[data-testid="stMetric"] {
     .hero-title { font-size: 2rem; }
     .hero-inner { align-items: flex-start; }
 }
+
+/* Fix mobile scaling issues */
+@media (max-width: 600px) {
+    .hero-title { font-size: 1.75rem; }
+    .hero { padding: 1.2rem 1rem; }
+}
 </style>
-""",
-    unsafe_allow_html=True,
+"""
+    , unsafe_allow_html=True
 )
 
 if "fsm" not in st.session_state:
     st.session_state.fsm = OrderFSM()
-if "order" not in st.session_state:
-    st.session_state.order = {
-        "event": None,
-        "date": None,
-        "category": None,
-        "qty": 1,
-    }
-if "booking_code" not in st.session_state:
-    st.session_state.booking_code = None
 if "confirmed" not in st.session_state:
     st.session_state.confirmed = False
+if "booking_code" not in st.session_state:
+    st.session_state.booking_code = None
 
-fsm = st.session_state.fsm
-order = st.session_state.order
+if "ev_key" not in st.session_state: st.session_state.ev_key = "Pilih event..."
+if "dt_key" not in st.session_state: st.session_state.dt_key = "Pilih tanggal..."
+if "kt_key" not in st.session_state: st.session_state.kt_key = "Pilih kategori..."
+if "qt_key" not in st.session_state: st.session_state.qt_key = 1
 
 events = {
     "Konser Harmoni Nusantara": {
@@ -261,43 +255,61 @@ categories = {
     "Ekonomi": 120000,
 }
 
-
 def format_rupiah(value):
-    return f"Rp {value:,}"
-
+    return f"Rp {value:,}".replace(",", ".")
 
 def generate_code():
     digits = "".join(random.choice("0123456789") for _ in range(6))
     return f"TKT-{digits}"
 
-
 def reset_all():
-    fsm.reset()
-    st.session_state.order = {
-        "event": None,
-        "date": None,
-        "category": None,
-        "qty": 1,
-    }
+    st.session_state.fsm.reset()
+    st.session_state.confirmed = False
     st.session_state.booking_code = None
+    st.session_state.ev_key = "Pilih event..."
+    st.session_state.dt_key = "Pilih tanggal..."
+    st.session_state.kt_key = "Pilih kategori..."
+    st.session_state.qt_key = 1
+
+# Logic parsing FSM and Order
+def build_current_state():
+    st.session_state.fsm.reset()
+    
+    ev = st.session_state.ev_key if st.session_state.ev_key != "Pilih event..." else None
+    dt = st.session_state.dt_key if st.session_state.dt_key != "Pilih tanggal..." else None
+    kt = st.session_state.kt_key if st.session_state.kt_key != "Pilih kategori..." else None
+    qt = int(st.session_state.qt_key)
+    
+    # Simulate automaton
+    if st.session_state.confirmed:
+        st.session_state.fsm.state = "q5"
+        return
+        
+    st.session_state.fsm.state = "q0"
+    if ev is not None:
+        st.session_state.fsm.step("E") 
+        if dt is not None:
+            st.session_state.fsm.step("T")
+            if kt is not None:
+                st.session_state.fsm.step("K")
+                if qt >= 1:
+                    st.session_state.fsm.step("J")
+
+def on_event_change():
+    st.session_state.dt_key = "Pilih tanggal..."
+    st.session_state.kt_key = "Pilih kategori..."
+    st.session_state.confirmed = False
+    
+def on_date_change():
+    st.session_state.kt_key = "Pilih kategori..."
     st.session_state.confirmed = False
 
+def on_category_change():
+    st.session_state.confirmed = False
+    
+def on_qty_change():
+    st.session_state.confirmed = False
 
-def compute_state(order_data, confirmed):
-    if confirmed:
-        return "q5"
-    if order_data["event"] is None:
-        return "q0"
-    if order_data["date"] is None:
-        return "q1"
-    if order_data["category"] is None:
-        return "q2"
-    if order_data["qty"] < 1:
-        return "q3"
-    return "q4"
-
-
-st.title("Pemesanan Tiket Konser")
 hero_html = f"""
 <div class="hero">
     <div class="hero-inner">
@@ -321,6 +333,10 @@ hero_html = f"""
 """
 st.markdown(hero_html, unsafe_allow_html=True)
 
+build_current_state()
+fsm = st.session_state.fsm
+current_state = fsm.state
+
 steps = [
     ("q0", "Event"),
     ("q1", "Tanggal"),
@@ -329,116 +345,102 @@ steps = [
     ("q4", "Konfirmasi"),
     ("q5", "Selesai"),
 ]
-current_state = compute_state(order, st.session_state.confirmed)
-fsm.state = current_state
-current_index = next(index for index, (state, _) in enumerate(steps) if state == current_state)
+current_index = next((index for index, (state, _) in enumerate(steps) if state == current_state), 0)
 step_html = "".join(
     f"<span class='step {'done' if index < current_index else 'active' if index == current_index else ''}'>{label}</span>"
     for index, (_, label) in enumerate(steps)
 )
 st.markdown(f"<div class='stepper'>{step_html}</div>", unsafe_allow_html=True)
 
-col_form, col_summary = st.columns([2, 1], gap="large")
+col_form, col_summary = st.columns([12, 10])
 
 with col_form:
     st.markdown("<p class='section-title'>Form Pemesanan</p>", unsafe_allow_html=True)
-    st.caption(f"Langkah saat ini: {fsm.current_label()}")
+    st.caption(f"Status: {fsm.current_label()}")
 
     event_options = ["Pilih event..."] + list(events.keys())
-    event_default = order["event"] if order["event"] else "Pilih event..."
-    event_choice = st.selectbox(
-        "Event",
+    st.selectbox(
+        "Pilih Event",
         event_options,
-        index=event_options.index(event_default),
-        disabled=fsm.state != "q0",
+        key="ev_key",
+        disabled=current_state == "q5",
+        on_change=on_event_change
     )
-    order["event"] = None if event_choice == "Pilih event..." else event_choice
 
-    if order["event"]:
-        st.caption(f"Venue: {events[order['event']]['venue']}")
-        date_options = ["Pilih tanggal..."] + events[order["event"]]["dates"]
+    ev_val = st.session_state.ev_key
+    if ev_val != "Pilih event...":
+        st.info(f"📍 Venue: {events[ev_val]['venue']}")
+        date_options = ["Pilih tanggal..."] + events[ev_val]["dates"]
     else:
         date_options = ["Pilih tanggal..."]
-    date_default = order["date"] if order["date"] in date_options else "Pilih tanggal..."
-    date_choice = st.selectbox(
-        "Tanggal",
+
+    st.selectbox(
+        "Pilih Tanggal",
         date_options,
-        index=date_options.index(date_default),
-        disabled=order["event"] is None,
+        key="dt_key",
+        disabled=ev_val == "Pilih event..." or current_state == "q5",
+        on_change=on_date_change
     )
-    order["date"] = None if date_choice == "Pilih tanggal..." else date_choice
-
+    
+    dt_val = st.session_state.dt_key
     category_options = ["Pilih kategori..."] + list(categories.keys())
-    category_default = order["category"] if order["category"] else "Pilih kategori..."
-    category_choice = st.selectbox(
-        "Kategori",
+    st.selectbox(
+        "Pilih Kategori",
         category_options,
-        index=category_options.index(category_default),
-        disabled=order["date"] is None,
+        key="kt_key",
+        disabled=dt_val == "Pilih tanggal..." or current_state == "q5",
+        on_change=on_category_change
     )
-    order["category"] = None if category_choice == "Pilih kategori..." else category_choice
 
-    qty_value = st.number_input(
+    kt_val = st.session_state.kt_key
+    st.number_input(
         "Jumlah tiket",
         min_value=1,
         max_value=10,
-        value=int(order["qty"]),
         step=1,
-        disabled=order["category"] is None,
+        key="qt_key",
+        disabled=kt_val == "Pilih kategori..." or current_state == "q5",
+        on_change=on_qty_change
     )
-    order["qty"] = int(qty_value)
+    
+    qt_val = st.session_state.qt_key
 
-    order_ready = (
-        order["event"] is not None
-        and order["date"] is not None
-        and order["category"] is not None
-        and order["qty"] >= 1
-    )
-    if not order_ready:
-        st.session_state.confirmed = False
-        st.session_state.booking_code = None
-
-    current_state = compute_state(order, st.session_state.confirmed)
-    if fsm.state != current_state:
-        fsm.state = current_state
-        st.rerun()
-
-    if current_state == "q4" and not st.session_state.confirmed:
-        st.info("Silakan cek ringkasan, lalu konfirmasi pesanan.")
-        if st.button("Konfirmasi Pesanan"):
-            st.session_state.confirmed = True
-            if st.session_state.booking_code is None:
-                st.session_state.booking_code = generate_code()
-            st.rerun()
+    if ev_val != "Pilih event..." and dt_val != "Pilih tanggal..." and kt_val != "Pilih kategori..." and qt_val >= 1:
+        if not st.session_state.confirmed:
+            st.divider()
+            st.info("✅ Pesanan siap dikonfirmasi. Periksa ringkasan di samping lalu klik tombol di bawah.")
+            if st.button("Konfirmasi Pesanan", use_container_width=True):
+                st.session_state.confirmed = True
+                if st.session_state.booking_code is None:
+                    st.session_state.booking_code = generate_code()
+                st.rerun()
 
     if current_state == "q5":
-        st.success("Pesanan selesai.")
-        st.text_input("Kode booking", value=st.session_state.booking_code, disabled=True)
-        if st.button("Buat Pesanan Baru"):
+        st.divider()
+        st.success("🎉 Pesanan selesai!")
+        st.text_input("Kode Booking Anda (Simpan ini)", value=st.session_state.booking_code, disabled=True)
+        if st.button("Buat Pesanan Baru", use_container_width=True):
             reset_all()
             st.rerun()
 
 with col_summary:
-    st.markdown("<p class='section-title'>Ringkasan Pesanan</p>", unsafe_allow_html=True)
+    st.markdown("<p class='section-title'>Ringkasan Tiket</p>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown(f"**🎟️ Event:** {ev_val if ev_val != 'Pilih event...' else '-'}")
+        st.markdown(f"**📅 Tanggal:** {dt_val if dt_val != 'Pilih tanggal...' else '-'}")
+        st.markdown(f"**🎫 Kategori:** {kt_val if kt_val != 'Pilih kategori...' else '-'}")
+        st.markdown(f"**👥 Jumlah Set:** {qt_val if (ev_val != 'Pilih event...' and dt_val != 'Pilih tanggal...' and kt_val != 'Pilih kategori...') else 0} tiket")
 
-    event_label = order["event"] if order["event"] else "-"
-    date_label = order["date"] if order["date"] else "-"
-    category_label = order["category"] if order["category"] else "-"
-    qty_label = order["qty"] if order["qty"] else 0
+        price = categories.get(kt_val, 0) if kt_val != 'Pilih kategori...' else 0
+        total = price * int(qt_val) if price else 0
+        st.markdown("---")
+        
+        col1, col2 = st.columns(2)
+        col1.markdown(f"<div style='color:var(--muted); font-size: 0.9rem;'>Harga Satuan<br/><b>{format_rupiah(price)}</b></div>", unsafe_allow_html=True)
+        col2.markdown(f"<div style='color:var(--muted); font-size: 0.9rem;'>Total Harga<br/><b>{format_rupiah(total)}</b></div>", unsafe_allow_html=True)
+        
+        st.write("")
 
-    st.markdown(f"Event: {event_label}")
-    if order["event"]:
-        st.caption(f"Venue: {events[order['event']]['venue']}")
-    st.markdown(f"Tanggal: {date_label}")
-    st.markdown(f"Kategori: {category_label}")
-    st.markdown(f"Jumlah tiket: {qty_label}")
-
-    price = categories.get(order["category"], 0)
-    total = price * int(order["qty"]) if price else 0
-    st.markdown("---")
-    st.markdown(f"Harga per tiket: {format_rupiah(price)}")
-    st.metric("Total", format_rupiah(total))
-
-    if st.button("Reset Pesanan"):
+    if st.button("Reset Data", use_container_width=True):
         reset_all()
         st.rerun()
